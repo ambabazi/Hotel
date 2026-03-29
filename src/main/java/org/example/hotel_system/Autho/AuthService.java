@@ -2,11 +2,13 @@ package org.example.hotel_system.Autho;
 
 import lombok.RequiredArgsConstructor;
 import org.example.hotel_system.Enum.Role;
-import org.example.hotel_system.Security.JwtService;
+import org.example.hotel_system.Security.JwtUtil;
+import org.example.hotel_system.user.User;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 
 @Service
 @RequiredArgsConstructor
@@ -14,48 +16,32 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
+    private final AuthenticationManager authManager;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already in use: " + request.getEmail());
+        if (userRepository.existsByEmail(request.email())) {
+            throw new RuntimeException("Email already in use");
         }
-
         User user = User.builder()
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword())) // ALWAYS hash!
-                .role(request.getRole() != null ? request.getRole() : Role.GUEST) // default GUEST
+                .email(request.email())
+                .password(passwordEncoder.encode(request.password()))
+                .name(request.name())
+                .role(Role.GUEST) // default role
+                .provider("local")
                 .build();
-
         userRepository.save(user);
-        String token = jwtService.generateToken(user);
-
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .role(user.getRole())
-                .build();
+        return new AuthResponse(jwtUtil.generateToken(user));
     }
 
-    public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+    public AuthResponse login(AuthRequest request) {
+        // This throws if credentials are wrong
+        authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.email(), request.password()));
 
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(request.email())
                 .orElseThrow();
-
-        String token = jwtService.generateToken(user);
-
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .role(user.getRole())
-                .build();
+        return new AuthResponse(jwtUtil.generateToken(user));
     }
 }

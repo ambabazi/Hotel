@@ -1,5 +1,6 @@
 package org.example.hotel_system.Autho;
 
+import org.example.hotel_system.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
